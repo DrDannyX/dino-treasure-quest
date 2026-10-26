@@ -1046,7 +1046,7 @@ function drawMusicBox() {
   for (const e of audio.recent(0.45)) {
     const fresh = 1 - e.age;
     if (e.kind === 'drums') { if (e.value === 'k') kick = Math.max(kick, fresh); continue; }
-    const w = e.kind === 'lead' ? 1 : e.kind === 'bass' ? 0.8 : e.kind === 'pad' ? 0.35 : 0.55;
+    const w = e.kind === 'lead' ? 1 : e.kind === 'bass' || e.kind === 'softBass' ? 0.8 : e.kind === 'pad' ? 0.35 : 0.55;
     heights[e.value % 12] = Math.max(heights[e.value % 12], fresh * w);
   }
   const colW = 18, gap = 6, left = Math.round(VIEW_W / 2 - (12 * (colW + gap) - gap) / 2), base = 190;
