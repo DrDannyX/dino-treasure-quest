@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Dino Treasure Quest</title>
+  <meta name="description" content="A 16-bit dinosaur adventure for 1-3 players starring Ace, Echo and Zipper.">
+  <meta name="theme-color" content="#0c0810">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><ellipse cx='7' cy='10' rx='6' ry='4' fill='%235ab87a'/><circle cx='12' cy='7' r='3' fill='%235ab87a'/><path d='M10 4 L14 1 L13 5Z' fill='%23f4ead0'/><rect x='3' y='12' width='2' height='3' fill='%233a8a5a'/><rect x='9' y='12' width='2' height='3' fill='%233a8a5a'/><rect x='12' y='6' width='1' height='1' fill='%23000'/></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game" aria-label="Dino Treasure Quest game"></canvas>
+
+  <div id="touch" hidden>
+    <div class="dpad">
+      <button data-act="left" aria-label="Left">&#9664;</button>
+      <button data-act="right" aria-label="Right">&#9654;</button>
+    </div>
+    <div class="face">
+      <button data-act="switch" class="y" aria-label="Switch hero">Y</button>
+      <button data-act="attack" class="x" aria-label="Attack">X</button>
+      <button data-act="action" class="b" aria-label="Ride / get off">B</button>
+      <button data-act="jump" class="a" aria-label="Jump">A</button>
+    </div>
+    <button data-act="start" class="start" aria-label="Start / Pause">START</button>
+    <button data-act="mute" class="sound" aria-label="Sound on / off">&#9835;</button>
+  </div>
+
+  <noscript>Dino Treasure Quest needs JavaScript turned on.</noscript>
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
