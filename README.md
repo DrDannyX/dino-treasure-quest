@@ -48,8 +48,8 @@ Get hit while riding and you're thrown off (no heart lost), and your dino runs o
 (WASD) to join, picks a hero with left/right, and anyone presses **Start** to begin. Up to 3
 players (e.g. three Xbox controllers, or two controllers plus the keyboard).
 
-On phones and tablets, on-screen buttons appear (single player). Press **B** on the title screen
-for the **music box**.
+On phones and tablets, on-screen buttons appear (single player). On the title screen, press **X**
+to see the **controls** or **B** for the **music box** (or click those labels with a mouse).
 
 ## Play locally
 

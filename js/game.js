@@ -217,6 +217,7 @@ function playTrack(i) {
 
 function step() {
   input.update();
+  if (click && G.frame - click.frame > 2) click = null;
   G.frame++;
   G.t++;
   if (G.toast && --G.toast.t <= 0) G.toast = null;
@@ -236,12 +237,21 @@ function step() {
         G.join = [{ dev, sel: 'A' }];
         audio.sfx('join');
         setState('story');
-      } else if (input.anyPressed('action') && G.t > 20) {
+      } else if ((input.anyPressed('action') || clicked(MUSIC_LINK)) && G.t > 20) {
         setState('musicbox');
         playTrack(G.track);
+      } else if ((input.anyPressed('attack') || clicked(CONTROLS_LINK)) && G.t > 20) {
+        audio.sfx('select');
+        setState('controls');
       }
       break;
     }
+    case 'controls':
+      if (G.t > 10 && (input.anyPressed('action') || input.anyPressed('start') || input.anyPressed('jump') || input.anyPressed('attack') || clicked())) {
+        audio.sfx('select');
+        setState('title');
+      }
+      break;
     case 'story':
       // Any button skips the story.
       if (G.t > 20 && (input.anyPressed('start') || input.anyPressed('jump') || input.anyPressed('action'))) setState('join');
@@ -823,6 +833,7 @@ function drawTitle() {
   drawText(ctx, '1 - 3 PLAYERS', VIEW_W / 2, 252, { align: 'center', color: '#ffe0a0' });
   drawText(ctx, 'HI ' + pad(G.hi, 6), VIEW_W - 6, 4, { align: 'right' });
   drawText(ctx, (G.touch ? 'B' : 'B / V') + ': MUSIC BOX', VIEW_W - 6, 14, { align: 'right', color: '#d8a848' });
+  drawText(ctx, 'X: CONTROLS', VIEW_W - 6, 24, { align: 'right', color: '#d8a848' });
   soundHint();
 }
 
@@ -893,6 +904,44 @@ function drawStory() {
   fade(VIEW_H - 48, 1);
   drawText(ctx, (G.touch ? 'TAP A' : 'PRESS START') + ' TO SKIP', VIEW_W - 8, VIEW_H - 12, { align: 'right', color: '#8a7a68' });
   soundHint();
+}
+
+const CONTROLS = [
+  ['MOVE', 'STICK / D-PAD', 'ARROWS', 'W A S D'],
+  ['JUMP', 'A', 'Z / SPACE', 'F'],
+  ['ATTACK', 'X', 'X', 'G'],
+  ['SWITCH HERO', 'Y', 'C', 'H'],
+  ['RIDE / GET OFF', 'B', 'V / SHIFT', 'R'],
+  ['PAUSE', 'MENU', 'ENTER', 'T'],
+  ['MUTE', 'VIEW', 'M', '-'],
+];
+
+function drawControls() {
+  drawBackground('jungle', G.frame * 0.2);
+  ctx.fillStyle = 'rgba(6,4,10,0.78)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  drawText(ctx, 'CONTROLS', VIEW_W / 2, 8, { scale: 3, align: 'center', color: GOLD });
+  const cols = [16, 140, 262, 372];
+  ['ACTION', 'XBOX PAD', 'KEYBOARD', 'PLAYER 2 KEYS'].forEach((h, i) => drawText(ctx, h, cols[i], 40, { color: '#d8a848' }));
+  ctx.fillStyle = 'rgba(216,168,72,0.4)';
+  ctx.fillRect(12, 50, VIEW_W - 24, 1);
+  CONTROLS.forEach((row, r) => {
+    const y = 58 + r * 15;
+    if (r % 2 === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(12, y - 4, VIEW_W - 24, 15);
+    }
+    row.forEach((cell, i) => drawText(ctx, cell, cols[i], y, { color: i ? '#e0d6c0' : '#c8b090' }));
+  });
+  const tips = [
+    'JUMP ONTO A FRIENDLY DINO TO RIDE IT.',
+    'ATTACK WHILE RIDING TO USE ITS POWER.',
+    'ACE SMASHES CRACKED ROCKS. ECHO HITS TARGETS.',
+    'ZIPPER CAN DOUBLE JUMP. STAND ON A BRACHIO TO RIDE UP.',
+  ];
+  tips.forEach((t, i) => drawText(ctx, t, VIEW_W / 2, 172 + i * 12, { align: 'center', color: '#a89878' }));
+  if (G.touch) drawText(ctx, 'ON-SCREEN BUTTONS MATCH THE XBOX LAYOUT', VIEW_W / 2, 226, { align: 'center', color: '#d8a848' });
+  if (Math.floor(G.frame / 30) % 2 === 0) drawText(ctx, 'PRESS B TO GO BACK', VIEW_W / 2, 246, { align: 'center' });
 }
 
 function drawJoin() {
@@ -1028,6 +1077,7 @@ function render() {
   switch (G.state) {
     case 'title': drawTitle(); break;
     case 'story': drawStory(); break;
+    case 'controls': drawControls(); break;
     case 'join': drawJoin(); break;
     case 'musicbox': drawMusicBox(); break;
     case 'intro': drawIntro(); break;
@@ -1051,6 +1101,19 @@ function render() {
 }
 
 // ------------------------------------------------------------------ boot
+
+// Clickable title-screen labels (in game pixels), for mouse users.
+const MUSIC_LINK = { x: VIEW_W - 110, y: 12, w: 106, h: 10 };
+const CONTROLS_LINK = { x: VIEW_W - 72, y: 22, w: 68, h: 10 };
+let click = null;
+
+// True once for a click inside `area` (or anywhere when no area is given).
+function clicked(area) {
+  if (!click) return false;
+  const hit = !area || (click.x >= area.x && click.x < area.x + area.w && click.y >= area.y && click.y < area.y + area.h);
+  if (hit) click = null;
+  return hit;
+}
 
 function resize() {
   const s = Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H);
@@ -1106,6 +1169,10 @@ function boot() {
     window.addEventListener(ev, () => audio.unlock(), { passive: true, capture: true });
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) audio.resume(); });
+  canvas.addEventListener('click', e => {
+    const r = canvas.getBoundingClientRect();
+    click = { x: (e.clientX - r.left) / r.width * VIEW_W, y: (e.clientY - r.top) / r.height * VIEW_H, frame: G.frame };
+  });
   input.onGamepadConnected(gp => toast('CONTROLLER ' + (gp.index + 1) + ' CONNECTED!'));
   // Handy for poking at the game from the browser console.
   window.dino = { G, W };
