@@ -767,21 +767,11 @@ function drawWorld() {
 }
 
 function drawPause() {
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillStyle = 'rgba(6,4,10,0.9)';
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  drawText(ctx, 'PAUSED', VIEW_W / 2, 50, { scale: 4, align: 'center', color: GOLD });
-  const lines = [
-    ['MOVE', 'STICK / D-PAD / ARROWS'],
-    ['JUMP', 'A / Z / SPACE'],
-    ['ATTACK', 'X / X'],
-    ['SWITCH HERO', 'Y / C'],
-    ['RIDE / GET OFF', 'B / V'],
-  ];
-  lines.forEach(([a, b], i) => {
-    drawText(ctx, a, 130, 100 + i * 16, { color: '#d8a848' });
-    drawText(ctx, b, 240, 100 + i * 16);
-  });
-  drawText(ctx, 'PRESS START TO PLAY', VIEW_W / 2, 200, { align: 'center' });
+  drawText(ctx, 'PAUSED', VIEW_W / 2, 56, { scale: 4, align: 'center', color: GOLD });
+  drawControlsTable(102);
+  drawText(ctx, 'PRESS START TO PLAY', VIEW_W / 2, 236, { align: 'center' });
 }
 
 
@@ -916,23 +906,28 @@ const CONTROLS = [
   ['MUTE', 'VIEW', 'M', '-'],
 ];
 
-function drawControls() {
-  drawBackground('jungle', G.frame * 0.2);
-  ctx.fillStyle = 'rgba(6,4,10,0.78)';
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  drawText(ctx, 'CONTROLS', VIEW_W / 2, 8, { scale: 3, align: 'center', color: GOLD });
+// The full key table, shared by the controls screen and the pause menu.
+function drawControlsTable(top) {
   const cols = [16, 140, 262, 372];
-  ['ACTION', 'XBOX PAD', 'KEYBOARD', 'PLAYER 2 KEYS'].forEach((h, i) => drawText(ctx, h, cols[i], 40, { color: '#d8a848' }));
+  ['ACTION', 'XBOX PAD', 'KEYBOARD', 'PLAYER 2 KEYS'].forEach((h, i) => drawText(ctx, h, cols[i], top, { color: '#d8a848' }));
   ctx.fillStyle = 'rgba(216,168,72,0.4)';
-  ctx.fillRect(12, 50, VIEW_W - 24, 1);
+  ctx.fillRect(12, top + 10, VIEW_W - 24, 1);
   CONTROLS.forEach((row, r) => {
-    const y = 58 + r * 15;
+    const y = top + 18 + r * 15;
     if (r % 2 === 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.05)';
       ctx.fillRect(12, y - 4, VIEW_W - 24, 15);
     }
     row.forEach((cell, i) => drawText(ctx, cell, cols[i], y, { color: i ? '#e0d6c0' : '#c8b090' }));
   });
+}
+
+function drawControls() {
+  drawBackground('jungle', G.frame * 0.2);
+  ctx.fillStyle = 'rgba(6,4,10,0.78)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  drawText(ctx, 'CONTROLS', VIEW_W / 2, 8, { scale: 3, align: 'center', color: GOLD });
+  drawControlsTable(40);
   const tips = [
     'JUMP ONTO A FRIENDLY DINO TO RIDE IT.',
     'ATTACK WHILE RIDING TO USE ITS POWER.',
