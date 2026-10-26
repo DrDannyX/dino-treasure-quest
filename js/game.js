@@ -1190,7 +1190,7 @@ function setupTouch() {
 }
 
 // Optional URL params: ?play&world=2&players=2 jumps straight in (keyboard
-// players), and ?debug shows the audio state and any script error on screen.
+// players, or the on-screen buttons on a phone), and ?debug shows the audio state and any script error on screen.
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
 const startWorld = clamp((+params.get('world') || 1) - 1, 0, LEVELS.length - 1);
@@ -1223,8 +1223,10 @@ function boot() {
   window.dino = { G, W };
 
   if (params.has('play')) {
-    const n = clamp(+params.get('players') || 1, 1, 2);
-    G.players = ['kb1', 'kb2'].slice(0, n).map((dev, i) => ({ idx: i, dev, hero: HERO_IDS[i], startHero: HERO_IDS[i] }));
+    // On phones and tablets, player 1 uses the on-screen buttons.
+    const devs = G.touch ? ['touch'] : ['kb1', 'kb2'];
+    const n = clamp(+params.get('players') || 1, 1, devs.length);
+    G.players = devs.slice(0, n).map((dev, i) => ({ idx: i, dev, hero: HERO_IDS[i], startHero: HERO_IDS[i] }));
     newGame();
     startPlay();
   }
