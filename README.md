@@ -3,7 +3,7 @@
 A dark, 16-bit style dinosaur adventure for **1–3 players**.
 
 It's Ace's birthday. While exploring the woods, Ace, Echo and Zipper find a glowing stone
-that whisks them away to a world of dinosaurs. To get home, they must find the three pieces of
+that whisks them away to a world of dinosaurs. To get home, they must find the four pieces of
 a treasure map, ride the friendly plant-eaters, battle the meat-eaters, and defeat the T-Rex
 guarding the treasure.
 

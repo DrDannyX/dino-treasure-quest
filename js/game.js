@@ -1,4 +1,4 @@
-import { TILE as T, VIEW_W, VIEW_H, ROWS, CAM_Y, GROUND, HERO_IDS, PLAYER_COLORS } from './constants.js';
+import { TILE as T, VIEW_W, VIEW_H, CAM_Y, GROUND, HERO_IDS, PLAYER_COLORS } from './constants.js';
 import { SPR, HEROES, THEMES, LAYER_W, buildSprites } from './sprites.js';
 import { paint, addOutline, tint, makeCanvas } from './gfx.js';
 import { drawText } from './font.js';
@@ -13,6 +13,8 @@ const ctx = canvas.getContext('2d');
 
 const GROUND_Y = GROUND * T;
 const START_LIVES = 5;
+// One map piece waits at the end of every level that has a goal.
+const MAP_PIECES = LEVELS.filter(l => l.goalX != null).length;
 const GOLD = ['#e8d0a0', '#b8862a', '#6a4010'];
 const BONE = ['#e0d6c0', '#a89878', '#6a5a48'];
 // Smouldering embers rather than bright colours.
@@ -43,20 +45,20 @@ function setState(s) {
 function loadLevel() {
   const def = LEVELS[G.world];
   const L = {
-    def, w: def.w, grid: def.grid.map(r => r.slice()), theme: def.theme,
+    def, w: def.w, rows: def.rows, grid: def.grid.map(r => r.slice()), theme: def.theme,
     ents: def.ents.map(spawnEnt).filter(Boolean),
     fx: [], popups: [], bumps: new Map(), springs: new Map(), opening: [], platforms: [],
-    camX: 0, arena: null, bossStarted: false,
+    camX: 0, camY: CAM_Y, arena: null, bossStarted: false,
   };
   W.level = L;
-  if (def.goalX != null) L.ents.push({ type: 'goal', x: def.goalX * T - 6, y: GROUND_Y - 22, w: 28, h: 22 });
+  if (def.goalX != null) L.ents.push({ type: 'goal', x: def.goalX * T - 6, y: def.goalY * T - 22, w: 28, h: 22 });
   if (def.bossArena) {
     L.arena = [def.bossArena[0] * T, (def.bossArena[1] + 1) * T];
     L.ents.push(makeTrex(L.arena[1] - 84, GROUND_Y));
   }
   L.platforms = L.ents.filter(e => e.type === 'brachio').flatMap(b => [b.back, b.head]);
 
-  let sx = def.startX * T, sy = GROUND_Y - 26;
+  let sx = def.startX * T, sy = def.startY * T - 26;
   const cp = G.checkpoint && G.checkpoint.world === G.world ? G.checkpoint : null;
   if (cp) {
     sx = cp.x;
@@ -75,6 +77,7 @@ function loadLevel() {
     h.player = p.idx;
     placeHero(h, sx + i * 20, sy);
     h.facing = 1;
+    h.offT = 0;
   });
   G.wiped = false;
   updateCamera(true);
@@ -90,6 +93,7 @@ function updateCamera(snap) {
     target = clamp(avg - VIEW_W / 2, 0, L.w * T - VIEW_W);
   }
   L.camX = snap ? target : L.camX + (target - L.camX) * 0.12;
+  if (L.rows * T > VIEW_H) updateCameraY(snap, hs);
   // With more than one player, nobody can wander off screen.
   if (hs.length > 1 || L.bossStarted) {
     for (const h of hs) {
@@ -97,6 +101,35 @@ function updateCamera(snap) {
       const lo = L.camX + 2, hi = L.camX + VIEW_W - 2 - b.w;
       if (b.x < lo) { b.x = lo; if (b.vx < 0) b.vx = 0; }
       if (b.x > hi) { b.x = hi; if (b.vx > 0) b.vx = 0; }
+    }
+  }
+}
+
+// Tall levels (caves) scroll up and down too. In co-op the camera keeps the
+// lead player (lowest number) on screen, and anyone left off the top or
+// bottom for a moment hops over to them.
+function updateCameraY(snap, hs) {
+  const L = W.level;
+  if (!hs.length) return;
+  const lead = heroBody(hs.reduce((a, b) => (b.player < a.player ? b : a)));
+  const avg = hs.reduce((s, h) => s + heroBody(h).y, 0) / hs.length;
+  let target = avg - VIEW_H * 0.55;
+  target = clamp(target, lead.y - VIEW_H + 70, lead.y - 50);
+  target = clamp(target, 0, L.rows * T - VIEW_H);
+  L.camY = snap ? target : L.camY + (target - L.camY) * 0.15;
+  for (const h of hs) {
+    const b = heroBody(h);
+    const off = b.y + b.h < L.camY - 8 || b.y > L.camY + VIEW_H + 8;
+    h.offT = off && b !== lead ? (h.offT || 0) + 1 : 0;
+    if (h.offT > 90) {
+      h.offT = 0;
+      b.x = lead.x;
+      b.y = lead.y + lead.h - b.h;
+      b.vx = b.vy = 0;
+      h.safeX = lead.x;
+      h.safeY = lead.y + lead.h - h.h;
+      h.invuln = 60;
+      sparkle(centerX(b), b.y + b.h / 2, 10);
     }
   }
 }
@@ -407,15 +440,27 @@ function buildUiSprites() {
   });
 }
 
-function drawBackground(theme, cx) {
+function drawBackground(theme, cx, cy = CAM_Y) {
   const bg = SPR.bg[theme];
   ctx.drawImage(bg.sky, 0, 0);
   for (const layer of bg.layers) {
-    let x = -(Math.floor(cx * layer.f) % LAYER_W);
-    for (; x < VIEW_W; x += LAYER_W) ctx.drawImage(layer.img, x, 0);
+    // Cave layers repeat top to bottom too, so they scroll with the camera.
+    const y0 = bg.vertical ? -(((Math.floor(cy * layer.f) % VIEW_H) + VIEW_H) % VIEW_H) : 0;
+    for (let y = y0; y < VIEW_H; y += VIEW_H) {
+      let x = -(Math.floor(cx * layer.f) % LAYER_W);
+      for (; x < VIEW_W; x += LAYER_W) ctx.drawImage(layer.img, x, y);
+      if (!bg.vertical) break;
+    }
   }
   const f = G.frame;
-  if (theme === 'volcano' || theme === 'lair') {
+  if (theme === 'cave') {
+    for (let i = 0; i < 24; i++) {
+      const x = ((i * 79.7 - cx * 0.6 + Math.sin(f * 0.015 + i) * 12) % VIEW_W + VIEW_W) % VIEW_W;
+      const y = (((i * 53 - cy * 0.6 - f * 0.2) % VIEW_H) + VIEW_H) % VIEW_H;
+      ctx.fillStyle = (f + i * 13) % 90 < 45 ? '#5ad0d0' : '#8a5ac8';
+      ctx.fillRect(Math.round(x), Math.round(y), 2, 2);
+    }
+  } else if (theme === 'volcano' || theme === 'lair') {
     for (let i = 0; i < 30; i++) {
       const x = ((i * 67.3 - cx * 0.6 + Math.sin(f * 0.02 + i) * 10) % VIEW_W + VIEW_W) % VIEW_W;
       const y = VIEW_H - ((i * 41 + f * (0.4 + (i % 3) * 0.2)) % VIEW_H);
@@ -480,6 +525,9 @@ function drawMist(cx) {
   }
 }
 
+// Vertical camera offset for the level being drawn (set by drawWorld).
+let camY = CAM_Y;
+
 function tileImage(c, tx, ty) {
   const t = SPR.tiles[W.level.theme];
   const above = W.level.grid[ty - 1] ? W.level.grid[ty - 1][tx] : ' ';
@@ -501,7 +549,8 @@ function tileImage(c, tx, ty) {
 function drawTiles(cx) {
   const L = W.level;
   const x0 = Math.max(0, Math.floor(cx / T)), x1 = Math.min(L.w - 1, x0 + Math.ceil(VIEW_W / T) + 1);
-  for (let ty = 0; ty < ROWS; ty++) {
+  const y0 = Math.max(0, Math.floor(camY / T)), y1 = Math.min(L.rows - 1, y0 + Math.ceil(VIEW_H / T) + 1);
+  for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       const c = L.grid[ty][tx];
       if (c === ' ') continue;
@@ -509,7 +558,7 @@ function drawTiles(cx) {
       if (!img) continue;
       const b = L.bumps.get(tx + ',' + ty);
       const off = b ? Math.round(Math.sin((10 - b) / 10 * Math.PI) * 5) : 0;
-      ctx.drawImage(img, tx * T - cx, ty * T - CAM_Y - off);
+      ctx.drawImage(img, tx * T - cx, ty * T - camY - off);
     }
   }
 }
@@ -517,7 +566,7 @@ function drawTiles(cx) {
 function drawShadow(e, cx) {
   if (!e.onGround) return;
   const w = Math.max(8, Math.round(e.w * 0.9));
-  ctx.drawImage(shadow(w), Math.round(centerX(e) - w / 2 - cx), Math.round(e.y + e.h - 3 - CAM_Y));
+  ctx.drawImage(shadow(w), Math.round(centerX(e) - w / 2 - cx), Math.round(e.y + e.h - 3 - camY));
 }
 
 function pick(set, facing, flash) {
@@ -527,11 +576,11 @@ function pick(set, facing, flash) {
 
 function drawBrachio(b, cx) {
   const sp = SPR.dinos.brachio;
-  const bx = Math.round(b.x - cx), by = Math.round(b.y - CAM_Y);
+  const bx = Math.round(b.x - cx), by = Math.round(b.y - camY);
   ctx.drawImage(sp.body, bx, by);
   // Neck from the shoulders up to the head, as a chain of discs.
   const sx = bx + 66, sy = by + 30;
-  const hx = bx + 84, hy = Math.round(b.head.y - CAM_Y) + 8;
+  const hx = bx + 84, hy = Math.round(b.head.y - camY) + 8;
   const pts = [];
   const n = 14;
   for (let i = 0; i <= n; i++) {
@@ -544,7 +593,7 @@ function drawBrachio(b, cx) {
   for (const [x, y] of pts) ctx.drawImage(sp.neck.outline, x - 8, y - 8);
   for (const [x, y] of pts) ctx.drawImage(sp.neck.fill, x - 7, y - 7);
   pts.forEach(([x, y], i) => { if (i % 3 === 1) ctx.drawImage(sp.neck.shade, x - 5, y - 6); });
-  ctx.drawImage(sp.head, Math.round(b.head.x - cx) - 2, Math.round(b.head.y - CAM_Y) - 2);
+  ctx.drawImage(sp.head, Math.round(b.head.x - cx) - 2, Math.round(b.head.y - camY) - 2);
 }
 
 function drawRideDino(d, cx) {
@@ -557,9 +606,9 @@ function drawRideDino(d, cx) {
   const ox = d.type === 'trike' ? (d.facing > 0 ? 24 : 30) : (d.facing > 0 ? 20 : 26);
   const sh = d.type === 'trike' ? 38 : 50;
   drawShadow(d, cx);
-  ctx.drawImage(img, Math.round(centerX(d) - ox - cx), Math.round(d.y + d.h - sh - CAM_Y));
+  ctx.drawImage(img, Math.round(centerX(d) - ox - cx), Math.round(d.y + d.h - sh - camY));
   if (!d.rider && d.state === 'idle' && Math.floor(G.frame / 30) % 2 && activeHeroes().some(h => Math.abs(centerX(h) - centerX(d)) < 60)) {
-    drawText(ctx, 'RIDE!', centerX(d) - cx, d.y - 22 - CAM_Y, { align: 'center', color: '#d8a848' });
+    drawText(ctx, 'RIDE!', centerX(d) - cx, d.y - 22 - camY, { align: 'center', color: '#d8a848' });
   }
 }
 
@@ -578,11 +627,11 @@ function drawEnemy(e, cx) {
   }
   if (!dead && e.type !== 'ptero') drawShadow(e, cx);
   const img = dead ? (e.facing > 0 ? set.dr : set.dl) : pick(set, e.facing, flash);
-  ctx.drawImage(img, Math.round(centerX(e) - ox - cx), Math.round(e.y + e.h - oh - CAM_Y));
+  ctx.drawImage(img, Math.round(centerX(e) - ox - cx), Math.round(e.y + e.h - oh - camY));
   if (e.stun > 0) {
     for (let i = 0; i < 3; i++) {
       const a = G.frame * 0.1 + i * 2.1;
-      ctx.drawImage(SPR.items.star, Math.round(centerX(e) - 4 + Math.cos(a) * 10 - cx), Math.round(e.y - 10 + Math.sin(a) * 3 - CAM_Y));
+      ctx.drawImage(SPR.items.star, Math.round(centerX(e) - 4 + Math.cos(a) * 10 - cx), Math.round(e.y - 10 + Math.sin(a) * 3 - camY));
     }
   }
 }
@@ -593,22 +642,22 @@ function drawTrex(e, cx) {
   if (e.mode === 'roar' || e.mode === 'windup') set = sp.roar;
   if (e.mode === 'dazed') set = sp.dazed;
   const flash = e.flash > 0 && e.flash % 2 === 0;
-  ctx.drawImage(shadow(90), Math.round(centerX(e) - 45 - cx), GROUND_Y - 3 - CAM_Y);
+  ctx.drawImage(shadow(90), Math.round(centerX(e) - 45 - cx), GROUND_Y - 3 - camY);
   const img = pick(set, e.facing, flash);
   const ox = e.facing > 0 ? 54 : 70;
-  ctx.drawImage(img, Math.round(centerX(e) - ox - cx), Math.round(e.y + e.h - 100 - CAM_Y));
+  ctx.drawImage(img, Math.round(centerX(e) - ox - cx), Math.round(e.y + e.h - 100 - camY));
   if (e.mode === 'dazed') {
     const hx = e.facing < 0 ? e.x + 10 : e.x + e.w - 10;
     for (let i = 0; i < 4; i++) {
       const a = G.frame * 0.1 + i * 1.6;
-      ctx.drawImage(SPR.items.star, Math.round(hx + Math.cos(a) * 16 - cx), Math.round(e.y - 14 + Math.sin(a) * 4 - CAM_Y));
+      ctx.drawImage(SPR.items.star, Math.round(hx + Math.cos(a) * 16 - cx), Math.round(e.y - 14 + Math.sin(a) * 4 - camY));
     }
   }
 }
 
 function drawItem(e, cx) {
   const it = SPR.items;
-  const x = Math.round(e.x - cx), y = Math.round(e.y - CAM_Y);
+  const x = Math.round(e.x - cx), y = Math.round(e.y - camY);
   switch (e.type) {
     case 'gem': case 'gemDrop': {
       if (e.life && e.life < 120 && G.frame % 6 < 3) return;
@@ -647,7 +696,7 @@ function drawItem(e, cx) {
       break;
     case 'rock':
       if (e.warn > 0) {
-        if (G.frame % 8 < 5) ctx.drawImage(shadow(18), x, GROUND_Y - 3 - CAM_Y);
+        if (G.frame % 8 < 5) ctx.drawImage(shadow(18), x, GROUND_Y - 3 - camY);
       } else ctx.drawImage(it.rock, x, y);
       break;
     case 'chest':
@@ -660,7 +709,7 @@ function drawItem(e, cx) {
 function drawHero(h, cx) {
   const spr = SPR.heroes[h.id];
   if (h.state === 'bubble') {
-    const x = Math.round(h.x - cx), y = Math.round(h.y - CAM_Y);
+    const x = Math.round(h.x - cx), y = Math.round(h.y - camY);
     ctx.drawImage(spr.frames.hurt.r, x - 10, y - 7);
     ctx.drawImage(BUBBLE, x - 16, y - 10);
     if (G.frame % 40 < 24) drawText(ctx, 'HELP!', x + 6, y - 20, { align: 'center', color: '#d8a848' });
@@ -672,11 +721,11 @@ function drawHero(h, cx) {
   const set = spr.frames[frame] || spr.frames.stand;
   if (!h.riding) drawShadow(h, cx);
   const hop = frame === 'cheer' && !h.riding ? -4 : 0;
-  ctx.drawImage(pick(set, h.facing), Math.round(h.x - (h.facing > 0 ? 10 : 14) - cx), Math.round(h.y - 7 - CAM_Y + hop));
+  ctx.drawImage(pick(set, h.facing), Math.round(h.x - (h.facing > 0 ? 10 : 14) - cx), Math.round(h.y - 7 - camY + hop));
   // Player tag so everyone can find themselves.
   if (G.players.length > 1) {
     const p = G.players[h.player];
-    drawText(ctx, 'P' + (p.idx + 1), centerX(h) - cx, h.y - 18 - CAM_Y, { align: 'center', color: PLAYER_COLORS[p.idx] });
+    drawText(ctx, 'P' + (p.idx + 1), centerX(h) - cx, h.y - 18 - camY, { align: 'center', color: PLAYER_COLORS[p.idx] });
   }
 }
 
@@ -685,9 +734,9 @@ function drawFx(cx) {
   for (const f of L.fx) {
     ctx.fillStyle = f.color;
     const s = f.size * Math.min(1, f.life / 10);
-    ctx.fillRect(Math.round(f.x - cx - s / 2), Math.round(f.y - CAM_Y - s / 2), Math.ceil(s), Math.ceil(s));
+    ctx.fillRect(Math.round(f.x - cx - s / 2), Math.round(f.y - camY - s / 2), Math.ceil(s), Math.ceil(s));
   }
-  for (const p of L.popups) drawText(ctx, p.text, p.x - cx, p.y - CAM_Y, { align: 'center', color: p.color });
+  for (const p of L.popups) drawText(ctx, p.text, p.x - cx, p.y - camY, { align: 'center', color: p.color });
 }
 
 function drawHud() {
@@ -734,7 +783,8 @@ function drawWorld() {
   const L = W.level;
   const sx = G.shake ? Math.round((Math.random() - 0.5) * G.shake) : 0;
   const cx = Math.round(L.camX) + sx;
-  drawBackground(L.theme, cx);
+  camY = Math.round(L.camY);
+  drawBackground(L.theme, cx, camY);
   for (const e of L.ents) if (e.type === 'brachio') drawBrachio(e, cx);
   drawTiles(cx);
   for (const e of L.ents) {
@@ -755,7 +805,7 @@ function drawWorld() {
   drawHud();
   if (G.state === 'clear') {
     drawText(ctx, 'MAP PIECE FOUND!', VIEW_W / 2, 90, { scale: 3, align: 'center', color: GOLD });
-    drawText(ctx, (G.world + 1) + ' OF 3', VIEW_W / 2, 122, { scale: 2, align: 'center', color: '#ffffff' });
+    drawText(ctx, (G.world + 1) + ' OF ' + MAP_PIECES, VIEW_W / 2, 122, { scale: 2, align: 'center', color: '#ffffff' });
   }
   if (G.state === 'wipe') {
     drawText(ctx, 'OH NO!', VIEW_W / 2, 100, { scale: 4, align: 'center', color: '#b83a30' });
@@ -852,9 +902,9 @@ const STORY = [
   'CAN RETURN HOME.',
   '',
   'BUT THE MAP WAS TORN INTO',
-  'THREE PIECES, LOST IN THE',
-  'JUNGLE, THE VOLCANO',
-  'AND THE SWAMP.',
+  'FOUR PIECES, LOST IN THE',
+  'JUNGLE, THE VOLCANO,',
+  'THE SWAMP AND THE CAVES.',
   '',
   'THE GENTLE PLANT-EATERS',
   'WILL HELP YOU.',
@@ -976,9 +1026,9 @@ function drawIntro() {
   const def = LEVELS[G.world];
   drawText(ctx, G.world === LEVELS.length - 1 ? 'FINAL WORLD' : 'WORLD ' + (G.world + 1), VIEW_W / 2, 36, { scale: 3, align: 'center' });
   drawText(ctx, def.name, VIEW_W / 2, 70, { scale: 4, align: 'center', color: GOLD });
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < MAP_PIECES; i++) {
     ctx.globalAlpha = i < G.world ? 1 : 0.25;
-    ctx.drawImage(SPR.items.map, VIEW_W / 2 - 50 + i * 36, 112, 22, 20);
+    ctx.drawImage(SPR.items.map, VIEW_W / 2 - 11 + (i - (MAP_PIECES - 1) / 2) * 36, 112, 22, 20);
   }
   ctx.globalAlpha = 1;
   drawText(ctx, 'MAP PIECES', VIEW_W / 2, 138, { align: 'center', color: '#ffe0a0' });

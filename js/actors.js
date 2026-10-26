@@ -1,5 +1,5 @@
 // Heroes, dinosaurs (friendly and not), items and projectiles.
-import { TILE as T, ROWS, VIEW_W, GROUND, HERO_IDS } from './constants.js';
+import { TILE as T, VIEW_W, VIEW_H, GROUND, HERO_IDS } from './constants.js';
 import { HEROES } from './sprites.js';
 import {
   G, W, tileAt, setTile, isSolid, overlap, centerX, moveX, moveY, onSafeGround, inHazard, onSpikes,
@@ -238,7 +238,7 @@ function reviveHero(h, x, y, hp) {
 function updateBubble(h) {
   const idx = h.player || 0;
   const tx = W.level.camX + VIEW_W / 2 - 6 + (idx - 1) * 40;
-  const ty = 60 + Math.sin(G.frame * 0.05 + idx) * 6;
+  const ty = W.level.camY + 60 + Math.sin(G.frame * 0.05 + idx) * 6;
   h.x += (tx - h.x) * 0.03;
   h.y += (ty - h.y) * 0.03;
   for (const o of activeHeroes()) {
@@ -687,7 +687,8 @@ export function damageEnemy(e, dmg, fromX) {
 function updateEnemy(e) {
   const L = W.level;
   if (!e.active) {
-    if (e.x < L.camX + VIEW_W + 40 && e.x + e.w > L.camX - 80) e.active = true;
+    const near = e.x < L.camX + VIEW_W + 40 && e.x + e.w > L.camX - 80 && e.y < L.camY + VIEW_H + 80 && e.y + e.h > L.camY - 80;
+    if (near) e.active = true;
     else return;
   }
   e.t++;
@@ -697,7 +698,7 @@ function updateEnemy(e) {
     e.vy += 0.4;
     e.x += e.vx;
     e.y += e.vy;
-    if (e.y > ROWS * T + 40) e.gone = true;
+    if (e.y > W.level.rows * T + 40) e.gone = true;
     return;
   }
   if (e.stun > 0) {
@@ -790,7 +791,7 @@ function updateEnemy(e) {
       break;
     }
   }
-  if (e.type !== 'ptero' && e.y > ROWS * T) e.gone = true;
+  if (e.type !== 'ptero' && e.y > W.level.rows * T) e.gone = true;
   if (e.type !== 'ptero' && inHazard(e)) e.gone = true;
   contactHeroes(e);
 }
@@ -972,7 +973,7 @@ function bounceItem(e) {
   if (moveX(e)) e.vx = -v;
   moveY(e, { platforms: true });
   if (e.onGround) e.vx *= 0.9;
-  if (--e.life <= 0 || e.y > ROWS * T) e.gone = true;
+  if (--e.life <= 0 || e.y > W.level.rows * T) e.gone = true;
 }
 
 function updateItem(e) {

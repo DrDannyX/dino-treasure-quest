@@ -1,5 +1,5 @@
 // Shared game state, tile physics and visual-effect helpers.
-import { TILE as T, ROWS } from './constants.js';
+import { TILE as T } from './constants.js';
 
 export const G = {
   state: 'title', t: 0, frame: 0,
@@ -21,12 +21,12 @@ export const isSolid = c => SOLID.has(c);
 export function tileAt(tx, ty) {
   const L = W.level;
   if (tx < 0 || tx >= L.w) return 'S';
-  if (ty < 0 || ty >= ROWS) return ' ';
+  if (ty < 0 || ty >= L.rows) return ' ';
   return L.grid[ty][tx];
 }
 
 export function setTile(tx, ty, c) {
-  if (ty >= 0 && ty < ROWS && tx >= 0 && tx < W.level.w) W.level.grid[ty][tx] = c;
+  if (ty >= 0 && ty < W.level.rows && tx >= 0 && tx < W.level.w) W.level.grid[ty][tx] = c;
 }
 
 export const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -109,7 +109,7 @@ export function onSafeGround(e) {
 }
 
 export function inHazard(e) {
-  if (e.y > ROWS * T + 8) return true;
+  if (e.y > W.level.rows * T + 8) return true;
   const ty = Math.floor((e.y + e.h - 4) / T);
   for (let tx = Math.floor(e.x / T); tx <= Math.floor((e.x + e.w - 1) / T); tx++) {
     if (tileAt(tx, ty) === 'L') return true;

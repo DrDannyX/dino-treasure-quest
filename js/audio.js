@@ -117,6 +117,17 @@ const SONGS = {
            D6 - - . C6 . Bb5 . G5 - - . A5 . Bb5 .
            A5 - - - E5 - - - C#5 - - - A4 - - -`,
   },
+  cave: {
+    bpm: 116, chords: 'Am F G Em Am F E E', drums: 'gentle', bass: 'slow', arp: 'sparkle',
+    lead: `A4 . C5 . E5 . A5 - - . G5 . E5 . C5 .
+           F5 - - . A5 . C6 . A5 - - . F5 . C5 .
+           G5 . B5 . D6 - - . B5 . G5 . D5 - - .
+           E5 - - - G5 - - - B5 - - - . . . .
+           A5 . . A5 . . C6 . B5 . A5 . E5 . C5 .
+           F5 . A5 . C6 . F6 - - . E6 . C6 . A5 .
+           G#5 - - . B5 . E6 . D6 - - . B5 . G#5 .
+           E5 - - - - - - - B4 - - - - - . .`,
+  },
   boss: {
     bpm: 168, chords: 'Cm Cm Ab Bb Cm Cm Ab G', drums: 'fast', bass: 'pump', arp: 'sparkle',
     lead: `C5 C5 . C5 Eb5 . C5 . G5 . F5 . Eb5 . D5 .
@@ -155,6 +166,7 @@ export const TRACKS = [
   { name: 'FERN JUNGLE', song: 'jungle' },
   { name: 'VOLCANO VALLEY', song: 'volcano' },
   { name: 'MISTY SWAMP', song: 'swamp' },
+  { name: 'CRYSTAL CAVES', song: 'cave' },
   { name: 'T-REX SHOWDOWN', song: 'boss' },
   { name: 'TREASURE FOUND', song: 'treasure' },
   { name: 'MAP PIECE', jingle: 'clear' },

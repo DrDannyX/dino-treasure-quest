@@ -580,6 +580,12 @@ export const THEMES = {
     hazard: ['#7a5a9a', '#4a3060', '#2a1a3a', '#160c20'], spikes: ['#e0e0c8', '#8a8a70'],
     sky: ['#06080e', '#142028', '#304840'], music: 'swamp',
   },
+  cave: {
+    top: ['#5ab0a8', '#2e7a80', '#1a4a58'], dirt: ['#2a2438', '#1c1828', '#3e3450'],
+    stone: ['#7a7a9a', '#4e4e6e', '#2a2a40'], plat: ['#6a6a88', '#44445e', '#24243a'], vine: '#2a8a8a',
+    hazard: null, spikes: ['#c0f0ff', '#5aa0c0'],
+    sky: ['#04040a', '#0a0a18', '#141428'], music: 'cave',
+  },
   lair: {
     top: ['#9a8a9a', '#6a5a6a', '#3e3240'], dirt: ['#3e3240', '#2a2030', '#5a4a5a'],
     stone: ['#9a8aa0', '#6a5a70', '#3a2e40'], plat: ['#8a7a8a', '#5a4a5a', '#2a2030'], vine: null,
@@ -727,6 +733,16 @@ function wrapped(fn) {
   for (const off of [-LAYER_W, 0, LAYER_W]) fn(off);
 }
 
+// Wraps both ways, for cave layers that also repeat top to bottom.
+function wrapped2(fn) {
+  for (const oy of [-VIEW_H, 0, VIEW_H]) wrapped(o => fn(o, oy));
+}
+
+function crystal(g, x, y, h, w, light, dark) {
+  tri(g, [[x - w, y], [x, y - h], [x + w, y]], dark);
+  tri(g, [[x - w, y], [x, y - h], [x, y]], light);
+}
+
 function blob(g, x, y, rx, ry, col) {
   g.fillStyle = col;
   g.beginPath();
@@ -852,6 +868,38 @@ function buildBackground(key) {
         wrapped(o => tri(g, [[x + o, 240], [x + o + 2, 196 + (i * 7) % 30], [x + o + 4, 240]], i % 2 ? '#0a140a' : '#101c10'));
       }
     });
+  } else if (key === 'cave') {
+    layer(0.1, g => {
+      for (let i = 0; i < 6; i++) {
+        const x = i * 86 + (i % 2) * 20, w = 18 + (i % 3) * 8;
+        wrapped2((o, oy) => {
+          g.fillStyle = '#10101e';
+          g.fillRect(x + o - w / 2, oy, w, VIEW_H);
+          for (let y = 0; y < VIEW_H; y += 18) blob(g, x + o + Math.sin(y * 0.07 + i) * 6, y + oy, w * 0.7, 12, '#10101e');
+        });
+      }
+    });
+    layer(0.3, g => {
+      for (let i = 0; i < 10; i++) {
+        const x = i * 51 + (i % 3) * 11, y = (i * 97) % VIEW_H + 20;
+        const [light, dark] = i % 3 ? ['#2a7a8a', '#1a4a5a'] : ['#6a4a9a', '#3a2a5a'];
+        wrapped2((o, oy) => {
+          blob(g, x + o, y + oy, 20, 8, '#181828');
+          crystal(g, x + o - 8, y + oy, 22, 5, light, dark);
+          crystal(g, x + o + 3, y + oy, 32, 6, light, dark);
+          crystal(g, x + o + 13, y + oy, 16, 4, light, dark);
+        });
+      }
+    });
+    layer(0.55, g => {
+      for (let i = 0; i < 14; i++) {
+        const x = i * 37 + (i % 4) * 5, y = (i * 61) % VIEW_H, len = 14 + (i * 11) % 26;
+        wrapped2((o, oy) => {
+          blob(g, x + o, y + oy, 12, 5, '#0a0a14');
+          tri(g, [[x + o - 7, y + oy], [x + o + 7, y + oy], [x + o, y + oy + len]], '#0a0a14');
+        });
+      }
+    });
   } else if (key === 'lair') {
     layer(0.15, g => {
       for (let i = 0; i < 16; i++) {
@@ -871,7 +919,7 @@ function buildBackground(key) {
       }
     });
   }
-  return { sky: buildSky(t.sky), layers };
+  return { sky: buildSky(t.sky), layers, vertical: key === 'cave' };
 }
 
 // ------------------------------------------------------------------ build all
