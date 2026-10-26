@@ -35,7 +35,17 @@ const BASS = {
   bounce: ([r, , f]) => [r, '-', '.', r + 12, '.', r, f, '.', r, '-', '.', r + 12, '.', f, r + 12, '.'],
   walk: ([r, t, f]) => [r, '-', '-', '.', t, '-', '-', '.', f, '-', '-', '.', r + 12, '-', f, '.'],
   slow: ([r, , f]) => [r, '-', '-', '-', '-', '-', '.', '.', f, '-', '-', '.', r + 12, '-', '-', '.'],
+  // Driving 16th notes for the fast, scary tracks.
+  pump: ([r, , f]) => [r, r, r + 12, r, r, r, r + 12, r, r, r, r + 12, r, f, f, r + 12, f],
+  // Heavy, stomping hits.
+  stomp: ([r, , f]) => [r, '-', '.', r, '.', '.', r, '.', r, '-', '.', r, f, '.', r + 12, '.'],
 };
+
+// A deep sub-bass hit on the chord's root under every kick drum.
+function subBar(chord, drumBar) {
+  const root = chordMidi(chord, 1)[0];
+  return drumBar.map(d => (d === 'k' ? root : '.'));
+}
 
 const ARP = {
   up: ([a, b, c]) => [a, '.', b, '.', c, '.', a + 12, '.', c, '.', b, '.', a, '.', b, '.'],
@@ -47,7 +57,7 @@ const DRUMS = {
   march: 'k . h . s . h . k . h k s . h h',
   jungle: 'k . t . s t . t k . t t s . t .',
   rock: 'k . h . s . h . k k h . s . h h',
-  gentle: 'k . . . h . . . k . . . h . h .',
+  gentle: 'k . . . h . . k k . . . h . h .',
   fast: 'k h s h k h s h k h s h k k s c',
   none: '. . . . . . . . . . . . . . . .',
 };
@@ -57,7 +67,7 @@ const RIDE_LAYER = 't . t t . t t . t . t t . t . t';
 
 const SONGS = {
   title: {
-    bpm: 126, chords: 'Dm C Dm Bb Dm C Bb Am', drums: 'march', bass: 'walk', arp: 'up',
+    bpm: 126, chords: 'Dm C Dm Bb Dm C Bb Am', drums: 'march', bass: 'stomp', arp: 'up',
     lead: `C5 - - . F5 - - . A5 - G5 - F5 - C6 -
            C6 - - - - - . . G5 - A5 - G5 - E5 -
            D5 - - . F5 - - . A5 - G5 - F5 - D6 -
@@ -86,7 +96,7 @@ const SONGS = {
            F#5 - - . A5 . D6 . F#6 - - - - . . .`,
   },
   volcano: {
-    bpm: 150, chords: 'Em Em C D Em Em C B', drums: 'rock', bass: 'drive', arp: 'sparkle',
+    bpm: 150, chords: 'Em Em C D Em Em C B', drums: 'rock', bass: 'pump', arp: 'sparkle',
     lead: `E5 . E5 . G5 . E5 . B5 - - . A5 . G5 .
            F#5 . G5 . A5 . G5 . F#5 - E5 - - - . .
            E5 . E5 . G5 . C6 . B5 - - . A5 . G5 .
@@ -108,7 +118,7 @@ const SONGS = {
            A5 - - - E5 - - - C#5 - - - A4 - - -`,
   },
   boss: {
-    bpm: 168, chords: 'Cm Cm Ab Bb Cm Cm Ab G', drums: 'fast', bass: 'drive', arp: 'sparkle',
+    bpm: 168, chords: 'Cm Cm Ab Bb Cm Cm Ab G', drums: 'fast', bass: 'pump', arp: 'sparkle',
     lead: `C5 C5 . C5 Eb5 . C5 . G5 . F5 . Eb5 . D5 .
            C5 C5 . C5 Eb5 . G5 . C6 - - . B5 . G5 .
            Ab5 . G5 . F5 . Eb5 . C5 . Eb5 . Ab5 . C6 .
@@ -119,7 +129,7 @@ const SONGS = {
            B4 . D5 . G5 . B5 . D6 - - . B5 . G5 .`,
   },
   treasure: {
-    bpm: 120, chords: 'C Am F G C Am Dm G', drums: 'march', bass: 'walk', arp: 'up',
+    bpm: 120, chords: 'C Am F G C Am Dm G', drums: 'march', bass: 'stomp', arp: 'up',
     lead: `E5 - - . G5 - - . C6 - - - E6 - - -
            C6 - - . A5 - - . E5 - - - A5 - - -
            A5 - - . C6 - - . F6 - - - E6 - D6 -
@@ -178,6 +188,7 @@ function compileSong(s) {
       ...pads.map(steps => ({ kind: 'pad', steps })),
       { kind: 'arp', steps: bars.flatMap(b => ARP[s.arp](chordMidi(b, 4))) },
       { kind: 'bass', steps: bars.flatMap(b => BASS[s.bass](chordMidi(b, 2))) },
+      { kind: 'sub', steps: bars.flatMap(b => subBar(b, drumBar)) },
       { kind: 'drums', steps: bars.flatMap(() => drumBar) },
     ],
   };
@@ -198,7 +209,10 @@ const INSTR = {
   lead: { osc: [['pulse25', 0, 1], ['sawtooth', 6, 0.35]], vol: 0.075, a: 0.01, d: 0.2, s: 0.7, r: 0.1, cut: 3800, vib: 5 },
   pad: { osc: [['sawtooth', -9, 1], ['sawtooth', 9, 1]], vol: 0.016, a: 0.12, d: 0.3, s: 0.8, r: 0.3, cut: 1400 },
   arp: { osc: [['pulse12', 0, 1], ['sine', 1200, 0.5]], vol: 0.035, a: 0.002, d: 0.14, s: 0.05, r: 0.06, cut: 5000 },
-  bass: { osc: [['triangle', 0, 1], ['square', 0, 0.22]], vol: 0.16, a: 0.005, d: 0.12, s: 0.75, r: 0.05, cut: 1100 },
+  // Gritty saw + sub-octave square, with a filter that snaps shut for a thump.
+  bass: { osc: [['sawtooth', 0, 0.7], ['square', -1200, 0.55], ['triangle', 0, 0.8]], vol: 0.15, a: 0.004, d: 0.16, s: 0.55, r: 0.06, cut: 700, cutEnv: 2600 },
+  // Sine sub-bass, plus a quiet overtone so small speakers can still hear it.
+  sub: { osc: [['sine', 0, 1], ['triangle', 1200, 0.3]], vol: 0.32, a: 0.003, d: 0.2, s: 0.25, r: 0.08, cut: 500 },
   bell: { osc: [['sine', 0, 1], ['sine', 1200, 0.4], ['sine', 2400, 0.2]], vol: 0.09, a: 0.002, d: 0.5, s: 0.1, r: 0.2, cut: 8000 },
 };
 
@@ -275,6 +289,9 @@ class Synth {
     this.music.gain.value = 0.75;
     this.music.connect(this.master);
     this.music.connect(delay);
+    // Melody, chords and arpeggios dip on every kick so the beat pumps.
+    this.duck = c.createGain();
+    this.duck.connect(this.music);
     this.sfxBus = c.createGain();
     this.sfxBus.gain.value = 0.85;
     this.sfxBus.connect(this.master);
@@ -330,7 +347,10 @@ class Synth {
     g.gain.exponentialRampToValueAtTime(0.0001, Math.max(t + p.a + p.d, end) + p.r);
     const f = c.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.value = p.cut;
+    if (p.cutEnv) {
+      f.frequency.setValueAtTime(p.cutEnv, t);
+      f.frequency.exponentialRampToValueAtTime(p.cut, t + p.a + p.d);
+    } else f.frequency.value = p.cut;
     f.connect(g).connect(dest);
     const stop = Math.max(t + p.a + p.d, end) + p.r + 0.02;
     let lfo = null;
@@ -388,8 +408,11 @@ class Synth {
     const out = this.music;
     switch (kind) {
       case 'k':
-        this.tone(t, 150, 0.16, 'sine', 0.55, out, 42);
-        this.hiss(t, 0.02, 0.12, out, 'lowpass', 3000);
+        this.tone(t, 170, 0.2, 'sine', 0.75, out, 38);
+        this.tone(t, 900, 0.02, 'triangle', 0.25, out, 200);
+        this.hiss(t, 0.02, 0.14, out, 'lowpass', 3000);
+        this.duck.gain.setValueAtTime(0.5, t);
+        this.duck.gain.linearRampToValueAtTime(1, t + 0.17);
         break;
       case 's':
         this.hiss(t, 0.16, 0.28, out, 'bandpass', 1900, 0.8);
@@ -464,7 +487,8 @@ class Synth {
         if (m == null) continue;
         let hold = 1;
         while (ch.steps[(i + hold) % ch.steps.length] === '-' && hold < 16) hold++;
-        this.play(s.next, hz(m), hold * stepDur * 0.9, ch.kind, this.music);
+        const dest = ch.kind === 'bass' || ch.kind === 'sub' ? this.music : this.duck;
+        this.play(s.next, hz(m), hold * stepDur * 0.9, ch.kind, dest);
         this.note(s.next, ch.kind, m);
       }
       if (this.layer && s.loop) {
